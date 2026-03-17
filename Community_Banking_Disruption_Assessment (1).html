@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Community Banking Disruption Assessment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@300;400;600;700&display=swap" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #F7F4EF; font-family: 'Source Sans 3', sans-serif; }
+    input[type=range] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 100%;
+      background: transparent; cursor: pointer;
+      position: absolute; inset: 0; margin: 0; opacity: 0;
+    }
+    @media (max-width: 620px) {
+      .two-col { grid-template-columns: 1fr !important; }
+      .output-grid { grid-template-columns: 1fr !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+const QUESTIONS = [
+  {
+    id: "AI",
+    heading: "Artificial Intelligence",
+    question: "How severely will AI reshape the competitive economics of community banking?",
+    low:  "Adoption will be gradual and the relationship model provides a durable offset. The efficiency gap between large banks and community banks widens slowly, manageable through targeted operational improvements over time.",
+    high: "AI compresses the cost-to-serve for large institutions and fintechs to levels community banks cannot match through incremental improvement alone. Speed of credit decisions, personalized pricing, and automated servicing will redefine customer expectations faster than most transformation timelines assume.",
+    lowLabel: "Competitive gap is manageable",
+    highLabel: "Structural cost disadvantage requires transformation",
+    banking_note: "Efficiency ratio and cost-per-loan are the pressure points. Large banks are already operating AI-assisted underwriting at a fraction of community bank unit costs. How quickly does this become competitively decisive?",
+    default: 75, weight: 18, color: "#C0392B",
+  },
+  {
+    id: "CREDIT",
+    heading: "Local Employment & Credit Quality",
+    question: "How much will AI-driven job displacement affect borrowers' ability to repay?",
+    low:  "The local employment base (agriculture, trades, manufacturing, local services) has meaningful insulation from white-collar automation. Income stress will be limited and gradual enough for most borrowers to adapt without material credit deterioration.",
+    high: "Office work, insurance processing, healthcare administration — these are the jobs that populate community bank loan portfolios across most markets. Material AI-driven displacement in those sectors shows up as mortgage delinquency, commercial real estate vacancy, and small business stress. This is a credit risk that standard stress scenarios currently may not model.",
+    lowLabel: "Local economy absorbs displacement",
+    highLabel: "Credit losses follow the employment shock",
+    banking_note: "Standard stress testing models rate cycles, recessions, and housing corrections. Community banks with CRE and consumer concentration in service-sector markets carry exposure that isn't captured in current scenario libraries. This gap is increasingly an examination concern.",
+    default: 55, weight: 16, color: "#E67E22",
+  },
+  {
+    id: "DEMO",
+    heading: "Customer Demographics",
+    question: "How serious is the risk that a bank's deposit base ages out faster than it can be replaced?",
+    low:  "Wealth transfer is gradual and existing relationships provide runway for a younger acquisition strategy. The senior cohort's loyalty and deposit depth provides a stable funding base through the transition period.",
+    high: "Community banking's core customers are moving from accumulation to distribution, eventually drawing down savings, transferring wealth, and simplifying their financial lives. The replacement cohort has grown up with digital-first alternatives and has different expectations, different inertia, and fewer reasons to walk into a branch.",
+    lowLabel: "Deposit base is stable through the transition",
+    highLabel: "Funding base faces structural attrition",
+    banking_note: "Many community banks carry a disproportionate share of deposits in the 65+ age cohort, the segment in net drawdown mode. Core deposit replacement cost rises as the demographic shifts. This is a balance sheet and funding model consideration, not just a customer experience one, and it compounds quietly over a 7–10 year horizon.",
+    default: 65, weight: 14, color: "#E67E22",
+  },
+  {
+    id: "PAY",
+    heading: "Payments & Deposit Disintermediation",
+    question: "How much will stablecoins, real-time payments, and digital wallets erode the deposit franchise?",
+    low:  "Regulatory constraints on non-bank entities will limit displacement. Real-time payment adoption improves the community bank offering. Deposit relationships remain sticky because of the broader relationship context.",
+    high: "Pending stablecoin legislation, if enacted, allows technology companies to issue dollar-backed instruments and hold reserves outside the commercial banking system. Real-time settlement reduces the friction that historically kept deposits in place. Together, these represent structural and permanent threats to the funding model.",
+    lowLabel: "Deposit stickiness holds",
+    highLabel: "Funding model faces structural disruption",
+    banking_note: "Core deposits are the cheapest, most stable funding source a community bank has. Disintermediation does not need to be large to be significant. Only a 10–15% shift in core deposit balances materially changes net interest margin, liquidity management, and loan funding capacity. The GENIUS Act framework is worth monitoring closely regardless of one's current view.",
+    default: 40, weight: 14, color: "#2980B9",
+  },
+  {
+    id: "CYBER",
+    heading: "Fraud & Cyber Risk",
+    question: "How serious is the threat of AI-powered fraud and cyberattacks against institutions of this size?",
+    low:  "Security partnerships are current and well-resourced attackers historically concentrate on larger targets. Controls evolve in step with the threat environment, and community bank incident rates remain manageable relative to the sector overall.",
+    high: "AI dramatically lowers the cost of sophisticated social engineering. Deepfake audio, synthetic identity, and AI-assisted network reconnaissance can now defeat controls that were adequate two years ago. Community banks are increasingly the target of choice due to lighter defenses, meaningful balances, and less incident response capacity. A single successful wire fraud or ransomware event is a material balance sheet event for a smaller institution.",
+    lowLabel: "Current controls are adequate",
+    highLabel: "AI attack surface has outpaced the defenses",
+    banking_note: "Operational risk capital requirements and cyber insurance pricing are both moving in the same direction. FFIEC examination intensity around AI-specific threats is increasing. Institutions that cannot demonstrate AI-aware controls such as deepfake wire fraud procedures, synthetic identity detection, and AI-assisted phishing awareness training, are beginning to appear in examination findings.",
+    default: 60, weight: 12, color: "#C0392B",
+  },
+  {
+    id: "REG",
+    heading: "Regulatory Environment",
+    question: "How much will new rules around data portability and AI-assisted lending increase the compliance burden?",
+    low:  "Implementation timelines provide adequate runway. Compliance has always been a community bank competency and they are poised to adapt. The regulatory burden, while growing, is a known cost of the charter and can be absorbed within existing frameworks.",
+    high: "Section 1033 open banking requirements will compel institutions to make customer relationships portable to competitors. CRA assessment areas are being redefined to follow digital activity rather than branch footprint. AI-assisted credit tools carry fair lending liability even when the model is vendor-supplied. These are three distinct compliance vectors arriving on similar timelines.",
+    lowLabel: "Manageable within existing framework",
+    highLabel: "Multiple concurrent compliance exposures",
+    banking_note: "Section 1033, CRA modernization, and AI fair lending liability each represent individually manageable compliance challenges. The risk for community banks is overlap of three significant implementation workstreams arriving simultaneously in organizations with lean compliance functions and limited technology delivery capacity. Sequencing and vendor dependency will determine which institutions get ahead of this and which get caught.",
+    default: 55, weight: 10, color: "#27AE60",
+  },
+  {
+    id: "TALENT",
+    heading: "Talent & Execution Capacity",
+    question: "How significantly will talent constraints limit a community bank's ability to execute its strategic response?",
+    low:  "Culture, stability, and community ties are genuine competitive advantages in recruiting at the community bank level. Managed services models can supplement internal capacity where needed. The team required to execute a focused strategy is buildable.",
+    high: "The people who can architect, govern, and operate modern banking technology have more options than community banks can match on compensation or career trajectory. They are competing against remote roles at organizations with unlimited technology budgets. The risk is not just failing to hire. The gap between what disruption demands and what the organization can deliver compounds year over year.",
+    lowLabel: "Required team is buildable",
+    highLabel: "Execution gap becomes a ceiling on strategy",
+    banking_note: "Technology talent and compliance talent are both constrained nationally, with community banks structurally disadvantaged on compensation, infrastructure, and role complexity relative to fintechs and larger banks. Organizational process maturity determines how severe this constraint becomes. Banks at lower maturity levels face compounding disadvantage as every role transition carries institutional knowledge risk.",
+    default: 70, weight: 8, color: "#2980B9",
+  },
+  {
+    id: "MACRO",
+    heading: "Macro Conditions & Industry Consolidation",
+    question: "How disruptive will economic pressure and accelerating bank consolidation be to the competitive position of independent community banks?",
+    low:  "Community banks have navigated every economic cycle. Well-capitalized, locally-focused institutions convert dislocation into opportunity. Consolidation creates customer disruption that smaller institutions can capture.",
+    high: "The pace of bank mergers is accelerating for structural reasons — technology cost burden, regulatory overhead, and succession challenges — not just cyclical ones. Sustained net interest margin compression reduces the capital generation that funds the transformation response. These trends are directional, not cyclical.",
+    lowLabel: "Strength and focus create opportunity",
+    highLabel: "Consolidation and margin pressure compound simultaneously",
+    banking_note: "Independent community bank survival probability under sustained AI disruption has been modeled in various industry analyses at materially lower levels than most institutions' internal assumptions reflect. The decisions made in the next 24–36 months on capital posture, M&A positioning, efficiency trajectory, and technology investment are the primary variables. Default assumptions tend to produce default outcomes.",
+    default: 45, weight: 8, color: "#8E44AD",
+  },
+];
+
+const WEIGHT_TOTAL = QUESTIONS.reduce((a, q) => a + q.weight, 0);
+
+function getLevel(pct) {
+  if (pct >= 80) return {
+    label: "The evidence points to major disruption. Transformation is required",
+    summary: "At these assumptions, incremental operational improvement does not close the gap. The cumulative weight of competitive, demographic, credit, and operational pressures calls for a deliberate mandate to restructure how the bank competes. Its cost model, capital posture, risk appetite, and long-term ownership trajectory must reflect the evolving landscape.",
+    color: "#C0392B", bg: "#FDF0EE", border: "#E8C4BF",
+    actions: [
+      { title: "Publish an efficiency ratio glide path", body: "Set a multi-year cost-to-income target and connect every technology investment decision to it. The market for talent, capital, and strategic partners rewards institutions that demonstrate a credible improvement trajectory, not just an intent." },
+      { title: "Adopt a capital fortress posture", body: "Run Tier 1 capital 150–200 basis points above the regulatory minimum as a deliberate strategic choice. In a disruption environment, capital is optionality. Thinly capitalized institutions have one path; well-capitalized ones have several." },
+      { title: "Develop an informed M&A position", body: "Not a commitment to act, a commitment to be ready. Identify which nearby institutions create a more durable combined franchise. Understand what an acquisition of this institution would require and what it would be worth to a strategic buyer. The window to act on your own terms is not indefinitely open." },
+      { title: "Recalibrate risk appetite in vulnerable sectors", body: "Review concentration limits in commercial real estate and employment sectors most exposed to technology-driven job displacement. Build an AI employment shock scenario into the next stress test cycle alongside standard rate and recession scenarios." },
+    ],
+    urgency: "These are decisions for the next 12 months, not the next planning cycle.",
+  };
+  if (pct >= 60) return {
+    label: "Meaningful disruption is likely and deliberate investment is warranted",
+    summary: "The aggregate weight of these assumptions exceeds what operational efficiency alone can absorb. A structured response with a published improvement trajectory, stronger capital buffers, and active situational awareness on the consolidation landscape, is the appropriate posture for institutions at this assessment level.",
+    color: "#D35400", bg: "#FEF4EE", border: "#F0CDAD",
+    actions: [
+      { title: "Build and commit to an efficiency improvement plan", body: "Set a realistic 3–4 year cost-to-income target and connect each technology investment to that outcome. This disciplines prioritization and communicates credibility to examiners, analysts, and potential strategic partners." },
+      { title: "Strengthen capital above the minimum", body: "Treat excess capital as strategic flexibility rather than idle cost. At 150 basis points above minimums, the institution has room to invest through a downturn, absorb credit stress, or pursue a transaction from a position of strength." },
+      { title: "Develop quiet M&A situational awareness", body: "Understand the local consolidation landscape without announcing intent. Know which institutions are succession-challenged, which would strengthen the combined franchise, and what the institution is worth to a strategic acquirer." },
+      { title: "Review credit policy for emerging concentration risks", body: "Map the loan portfolio against AI-disrupted employment sectors and commercial real estate sub-types. Stress collateral values at meaningful haircuts on office and retail. Bring concentration limit recommendations to the risk committee before year-end." },
+    ],
+    urgency: "These are 12–24 month priorities, not long-range planning items.",
+  };
+  if (pct >= 40) return {
+    label: "Challenges are real but manageable with deliberate action",
+    summary: "This reflects a measured assessment where the disruption forces are present and directional, but there is time and capital capacity to respond thoughtfully. Proactive steps now preserve optionality and prevent more urgent action later.",
+    color: "#CA8A04", bg: "#FEFCE8", border: "#F0E4A0",
+    actions: [
+      { title: "Elevate efficiency as a governance metric", body: "Make the cost-to-income ratio an explicit board-level performance target with annual reporting and not just a management dashboard item." },
+      { title: "Hold capital at the upper end of the target range", body: "No structural change is required, but lean toward the higher end of capital targets through this planning period. Conditions can deteriorate faster than annual cycles allow for response." },
+      { title: "Stay informed on the consolidation landscape", body: "No immediate action is required. Maintain awareness of which nearby institutions are potential partners or succession candidates, so the institution is not starting from zero if an opportunity develops." },
+      { title: "Add forward-looking scenarios to annual stress testing", body: "Incorporate an AI employment displacement scenario and a core deposit attrition scenario in the next stress test cycle. These are increasingly standard examination expectations, not exotic additions." },
+    ],
+    urgency: "Plan for the next 12–18 months. Revisit assumptions annually.",
+  };
+  return {
+    label: "Near-term disruption risk appears limited at these assumptions",
+    summary: "The disruption forces are real but slow-moving enough that standard monitoring and annual reassessment are the appropriate response at this level. The existing strategic framework and risk management infrastructure is largely adequate given these inputs.",
+    color: "#16A34A", bg: "#F0FDF4", border: "#BBF7D0",
+    actions: [
+      { title: "Document the rationale for current strategic direction", body: "Record why current capital and efficiency targets are appropriate given current assumptions so they can be defended to examiners and updated efficiently when conditions change." },
+      { title: "Maintain current capital management approach", body: "No structural change to capital targets is indicated. Continue standard framework and review annually as part of the strategic planning cycle." },
+      { title: "Establish an annual disruption landscape review", body: "Bring these questions back each year. Build a standing agenda item for emerging disruption assessment. Not because the current view is wrong, but because the inputs change." },
+      { title: "Request an annual technology benchmarking briefing", body: "Review how peer institutions are deploying technology once per year to ensure the institution's competitive assessment remains grounded in current conditions." },
+    ],
+    urgency: "Annual review cadence is appropriate at this assessment level.",
+  };
+}
+
+function AnimatedNumber({ value, decimals = 0 }) {
+  const [disp, setDisp] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    const start = prev.current, end = value, t0 = performance.now();
+    const step = now => {
+      const t = Math.min((now - t0) / 400, 1);
+      const e = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+      setDisp(start + (end - start) * e);
+      if (t < 1) requestAnimationFrame(step);
+      else prev.current = end;
+    };
+    requestAnimationFrame(step);
+  }, [value]);
+  return <>{disp.toFixed(decimals)}</>;
+}
+
+function App() {
+  const [values, setValues] = useState(Object.fromEntries(QUESTIONS.map(q => [q.id, q.default])));
+  const [expanded, setExpanded] = useState(null);
+
+  const score = QUESTIONS.reduce((acc, q) => acc + (values[q.id] / 100) * q.weight, 0);
+  const scorePct = Math.round((score / WEIGHT_TOTAL) * 100);
+  const level = getLevel(scorePct);
+
+  const sans = { fontFamily: "'Source Sans 3', sans-serif" };
+  const lora = { fontFamily: "'Lora', Georgia, serif" };
+
+  const scenarios = [
+    { label: "Reset to base case", vals: Object.fromEntries(QUESTIONS.map(q => [q.id, q.default])) },
+    { label: "Optimistic",         vals: Object.fromEntries(QUESTIONS.map(q => [q.id, Math.max(10, q.default - 25)])) },
+    { label: "Stress case",        vals: Object.fromEntries(QUESTIONS.map(q => [q.id, Math.min(95, q.default + 15)])) },
+    { label: "All at midpoint",    vals: Object.fromEntries(QUESTIONS.map(q => [q.id, 50])) },
+  ];
+
+  return (
+    <div style={{ ...sans, background: "#F7F4EF", minHeight: "100vh", color: "#1A1A1A" }}>
+
+      <div style={{ background: "#1B3A6B", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ color: "#FFFFFF", fontWeight: 700, fontSize: 15, letterSpacing: "0.06em" }}>COMMUNITY BANKING DISRUPTION ASSESSMENT</div>
+        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase" }}>Interactive Framework · 2026</div>
+      </div>
+
+      <div style={{ maxWidth: 880, margin: "0 auto", padding: "48px 24px 64px" }}>
+
+        <div style={{ marginBottom: 48, maxWidth: 660 }}>
+          <h1 style={{ ...lora, fontSize: "clamp(26px, 4vw, 36px)", fontWeight: 600, color: "#1B3A6B", lineHeight: 1.2, marginBottom: 16 }}>
+            What disruption is your bank actually planning for?
+          </h1>
+          <p style={{ fontSize: 16, color: "#444", lineHeight: 1.8 }}>
+            Eight forces are reshaping community banking. They all exist, but how severely they will hit an institution like yours, in a market like yours, over the next decade. Set each slider to reflect your honest judgment. The output connects your assumptions directly to what a bank needs to do about them.
+          </p>
+          <p style={{ ...lora, fontStyle: "italic", fontSize: 15, color: "#888", lineHeight: 1.7, marginTop: 12 }}>
+            The final score is interesting but greater value will come from establishing a dialogue about risks that are largely over the horizon but fast approaching.
+          </p>
+        </div>
+
+        {QUESTIONS.map((q, qi) => {
+          const val = values[q.id];
+          const isOpen = expanded === q.id;
+          let feelLabel, feelColor;
+          if      (val >= 80) { feelLabel = "Severe impact expected";     feelColor = "#C0392B"; }
+          else if (val >= 60) { feelLabel = "Significant impact";          feelColor = "#D35400"; }
+          else if (val >= 40) { feelLabel = "Moderate — monitor closely";  feelColor = "#CA8A04"; }
+          else if (val >= 20) { feelLabel = "Limited impact";              feelColor = "#16A34A"; }
+          else                { feelLabel = "Minimal impact";              feelColor = "#16A34A"; }
+
+          return (
+            <div key={q.id} style={{ background: "#FFFFFF", border: `1px solid ${isOpen ? q.color + "55" : "#E8E4DC"}`, borderLeft: `4px solid ${q.color}`, borderRadius: 6, marginBottom: 14, transition: "border-color 0.2s" }}>
+              <div style={{ padding: "20px 24px", cursor: "pointer", userSelect: "none" }} onClick={() => setExpanded(isOpen ? null : q.id)}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: q.color, textTransform: "uppercase", marginBottom: 5 }}>
+                      {qi + 1} of {QUESTIONS.length} &nbsp;·&nbsp; {q.heading}
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", lineHeight: 1.4 }}>{q.question}</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: feelColor, whiteSpace: "nowrap" }}>{feelLabel}</div>
+                    <div style={{ fontSize: 10, color: "#BBB", marginTop: 2 }}>{isOpen ? "▲ collapse" : "▼ expand"}</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, color: "#999", maxWidth: "42%", lineHeight: 1.35 }}>{q.lowLabel}</span>
+                    <span style={{ fontSize: 11, color: "#999", maxWidth: "42%", lineHeight: 1.35, textAlign: "right" }}>{q.highLabel}</span>
+                  </div>
+                  <div style={{ position: "relative", height: 10, borderRadius: 5, background: "#EEE" }}>
+                    <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${val}%`, borderRadius: 5, background: `linear-gradient(90deg, ${q.color}55, ${q.color})`, transition: "width 0.08s ease" }} />
+                    <div style={{ position: "absolute", top: "50%", left: `${val}%`, transform: "translate(-50%, -50%)", width: 20, height: 20, borderRadius: "50%", background: "#FFFFFF", border: `3px solid ${q.color}`, boxShadow: "0 1px 4px rgba(0,0,0,0.15)", transition: "left 0.08s ease", pointerEvents: "none" }} />
+                    <input type="range" min={0} max={100} value={val}
+                      onChange={e => setValues(prev => ({ ...prev, [q.id]: parseInt(e.target.value) }))}
+                      onClick={e => e.stopPropagation()}
+                      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", margin: 0, zIndex: 2 }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
+                    {["Minimal","","Moderate","","Severe"].map((lbl, i) => (
+                      <span key={i} style={{ fontSize: 9, letterSpacing: "0.04em", color: i * 25 <= val ? q.color + "AA" : "#CCC", fontWeight: i * 25 <= val ? 600 : 400, transition: "color 0.2s", textAlign: i === 4 ? "right" : i === 2 ? "center" : "left" }}>{lbl}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {isOpen && (
+                <div style={{ borderTop: "1px solid #F0EDE8", padding: "0 24px 24px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }} className="two-col">
+                    <div style={{ background: "#F7FBF7", border: "1px solid #C6E6C6", borderRadius: 4, padding: "14px 16px" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#16A34A", textTransform: "uppercase", marginBottom: 7 }}>← If the impact is limited</div>
+                      <p style={{ fontSize: 13, color: "#444", lineHeight: 1.7 }}>{q.low}</p>
+                    </div>
+                    <div style={{ background: "#FEF8F7", border: "1px solid #F0C4BC", borderRadius: 4, padding: "14px 16px" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#C0392B", textTransform: "uppercase", marginBottom: 7 }}>If the impact is severe →</div>
+                      <p style={{ fontSize: 13, color: "#444", lineHeight: 1.7 }}>{q.high}</p>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12, background: "#F4F6FA", border: "1px solid #D8DFEA", borderLeft: "3px solid #1B3A6B", borderRadius: 4, padding: "12px 16px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#1B3A6B", textTransform: "uppercase", marginBottom: 5 }}>Banking context</div>
+                    <p style={{ fontSize: 13, color: "#4A5568", lineHeight: 1.7 }}>{q.banking_note}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", margin: "8px 0 40px" }}>
+          {scenarios.map(s => (
+            <button key={s.label} onClick={() => setValues(s.vals)} style={{ background: "#FFFFFF", border: "1px solid #D8D4CC", color: "#666", ...sans, fontSize: 12, padding: "7px 16px", borderRadius: 4, cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={e => { e.target.style.borderColor = "#1B3A6B"; e.target.style.color = "#1B3A6B"; }}
+              onMouseLeave={e => { e.target.style.borderColor = "#D8D4CC"; e.target.style.color = "#666"; }}
+            >{s.label}</button>
+          ))}
+        </div>
+
+        <div style={{ background: level.bg, border: `2px solid ${level.border}`, borderRadius: 8, padding: "36px", marginBottom: 36, transition: "all 0.4s ease" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 36, alignItems: "start", marginBottom: 28 }} className="output-grid">
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: level.color, textTransform: "uppercase", marginBottom: 4 }}>Impact Score</div>
+              <div style={{ fontSize: 76, fontWeight: 700, color: level.color, lineHeight: 1, transition: "color 0.4s" }}>
+                <AnimatedNumber value={scorePct} />
+              </div>
+              <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>out of 100</div>
+              <div style={{ marginTop: 14 }}>
+                <div style={{ height: 10, borderRadius: 5, background: "#E0DBD5", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${scorePct}%`, background: "linear-gradient(90deg, #16A34A, #CA8A04, #D35400, #C0392B)", borderRadius: 5, transition: "width 0.4s ease" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
+                  <span style={{ fontSize: 9, color: "#BBB" }}>Limited</span>
+                  <span style={{ fontSize: 9, color: "#BBB" }}>Severe</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h2 style={{ ...lora, fontSize: 19, fontWeight: 600, color: level.color, lineHeight: 1.35, marginBottom: 12 }}>{level.label}</h2>
+              <p style={{ fontSize: 15, color: "#333", lineHeight: 1.8, marginBottom: 10 }}>{level.summary}</p>
+              <div style={{ fontSize: 13, fontWeight: 700, color: level.color, letterSpacing: "0.04em" }}>{level.urgency}</div>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#888", textTransform: "uppercase", marginBottom: 14 }}>Strategic implications at this assessment level</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="two-col">
+              {level.actions.map((a, i) => (
+                <div key={i} style={{ background: "rgba(255,255,255,0.72)", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 5, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1B3A6B", marginBottom: 6 }}>{a.title}</div>
+                  <div style={{ fontSize: 13, color: "#555", lineHeight: 1.65 }}>{a.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #E8E4DC", borderRadius: 6, padding: "24px", marginBottom: 36 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#888", textTransform: "uppercase", marginBottom: 18 }}>Where the impact is concentrated</div>
+          {[...QUESTIONS].sort((a, b) => (values[b.id] / 100) * b.weight - (values[a.id] / 100) * a.weight).map(q => {
+            const contribution = (values[q.id] / 100) * q.weight;
+            const barPct = Math.min((contribution / (WEIGHT_TOTAL * 0.2)) * 100, 100);
+            let impactLabel, impactColor;
+            if      (values[q.id] >= 80) { impactLabel = "Severe";       impactColor = "#C0392B"; }
+            else if (values[q.id] >= 60) { impactLabel = "Significant";  impactColor = "#D35400"; }
+            else if (values[q.id] >= 40) { impactLabel = "Moderate";     impactColor = "#CA8A04"; }
+            else if (values[q.id] >= 20) { impactLabel = "Limited";      impactColor = "#16A34A"; }
+            else                         { impactLabel = "Minimal";      impactColor = "#16A34A"; }
+            return (
+              <div key={q.id} style={{ marginBottom: 13 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                  <span style={{ fontSize: 13, color: "#333", fontWeight: 500 }}>{q.heading}</span>
+                  <span style={{ fontSize: 12, color: impactColor, fontWeight: 700 }}>{impactLabel}</span>
+                </div>
+                <div style={{ height: 6, borderRadius: 3, background: "#F0EDE8", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${barPct}%`, background: q.color, borderRadius: 3, opacity: 0.7, transition: "width 0.35s ease" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #E8E4DC", borderRadius: 6, padding: "24px", marginBottom: 36 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#888", textTransform: "uppercase", marginBottom: 14 }}>How this assessment works</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }} className="two-col">
+            <p style={{ ...lora, fontSize: 13, color: "#666", lineHeight: 1.8, fontStyle: "italic" }}>
+              Each dimension is weighted by its strategic ceiling, its maximum potential effect on a community bank's competitive position, capital adequacy, and franchise value. The score reflects the aggregate impact burden as a percentage of the maximum possible disruption across all eight dimensions. It is not a probability model. It assumes these forces materialize and asks only how severely.
+            </p>
+            <p style={{ ...lora, fontSize: 13, color: "#666", lineHeight: 1.8, fontStyle: "italic" }}>
+              Where experienced people at the same institution disagree on the same inputs, that disagreement is more valuable than the score itself. The purpose is to surface where assumptions differ so strategic decisions are grounded in explicit beliefs rather than unexamined ones. Set your answers independently before comparing with colleagues.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ borderTop: "1px solid #E8E4DC", paddingTop: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }} className="two-col">
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#BBB", textTransform: "uppercase", marginBottom: 8 }}>Framework</div>
+            <p style={{ ...lora, fontSize: 13, color: "#888", lineHeight: 1.8, fontStyle: "italic" }}>
+              This framework is a sort of Drake Equation, originally used to estimate the number of communicating civilizations in the galaxy, applied to strategic planning. Rather than multiplying probabilities, it weights the assumed severity of known forces to produce a cumulative impact burden. The output is a prompt for conversation, not a prediction.
+            </p>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#BBB", textTransform: "uppercase", marginBottom: 8 }}>About This Tool</div>
+            <p style={{ ...lora, fontSize: 13, color: "#888", lineHeight: 1.8, fontStyle: "italic" }}>
+              Built as a practical planning tool for community bank leadership teams and boards. The base case inputs reflect an aggregated view of the community banking landscape as of early 2026. All inputs are adjustable to reflect your institution's market, portfolio composition, and competitive position.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: 36, fontSize: 10, color: "#CCC", letterSpacing: "0.15em", textTransform: "uppercase" }}>
+          Community Banking Disruption Assessment · 2026 · Free to share and adapt
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
